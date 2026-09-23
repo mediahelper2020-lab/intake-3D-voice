@@ -31,6 +31,7 @@
   let client = null;
   let avatar = null;
   let findings = [];
+  let tips = []; // {topic, tip} — 화면에만 보여주는 일반 생활정보(서버에는 전송하지 않음)
   let currentCaption = '';
   let ended = false;
   let greetingSent = false;
@@ -92,9 +93,32 @@
         <h3>지금까지 나눈 이야기</h3>
         <div id="rcFindingsList" class="rc-topics"><p class="voice-empty">아직 없습니다.</p></div>
       </div>
+      <div class="rc-tips" id="rcTipsWrap" style="display:none">
+        <h3>💡 알아두면 좋아요</h3>
+        <div id="rcTipsList" class="rc-tips-list"></div>
+      </div>
       <button type="button" class="rc-btn rc-btn-secondary" id="rcEnd">상담 마치기</button>`;
     avatar = window.AvatarAdapter.create(document.getElementById('rcAvatarArea'));
     document.getElementById('rcEnd').onclick = () => finishSession('completed');
+  }
+
+  // 진단·처방이 아닌 일반적인 생활정보만 화면에 보여준다. 서버로는 전송하지 않는다.
+  function applyTip(topic, tip) {
+    if (!tip) return;
+    tips.push({ topic: topic || '', tip: String(tip) });
+    renderTips();
+  }
+
+  function renderTips() {
+    const wrap = document.getElementById('rcTipsWrap');
+    const el = document.getElementById('rcTipsList');
+    if (!wrap || !el) return;
+    if (!tips.length) {
+      wrap.style.display = 'none';
+      return;
+    }
+    wrap.style.display = '';
+    el.innerHTML = tips.map((t) => `<div class="rc-tip-card">💡 ${esc(t.tip)}</div>`).join('');
   }
 
   // 구체적인 답변 내용이 아니라 "어떤 주제로 이야기를 나눴는지"만 어르신께 보여준다.
@@ -132,14 +156,19 @@
   }
 
   function handleFunctionCall(evt) {
-    if (evt.name !== 'record_intake_findings') return;
     let args = null;
     try {
       args = JSON.parse(evt.arguments || '{}');
     } catch {
       args = null;
     }
-    if (args && Array.isArray(args.updates)) applyUpdates(args.updates);
+    if (evt.name === 'record_intake_findings') {
+      if (args && Array.isArray(args.updates)) applyUpdates(args.updates);
+    } else if (evt.name === 'share_wellness_tip') {
+      if (args && args.tip) applyTip(args.topic, args.tip);
+    } else {
+      return;
+    }
     client.sendEvent({
       type: 'conversation.item.create',
       item: { type: 'function_call_output', call_id: evt.call_id, output: JSON.stringify({ ok: true }) }
@@ -180,6 +209,7 @@
     renderActive();
     avatar.setThinking(false);
     greetingSent = false;
+    tips = [];
     client = new window.RealtimeVoiceClient({
       onEvent: handleRealtimeEvent,
       onConnectionState: (state) => {

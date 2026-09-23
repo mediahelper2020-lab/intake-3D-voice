@@ -1,7 +1,7 @@
 // Vercel 서버리스 함수: OpenAI Realtime API용 단명(ephemeral) 클라이언트 시크릿 발급
 // OPENAI_API_KEY는 절대 브라우저로 전달하지 않는다. 이 함수가 반환하는 것은
 // 짧은 시간만 유효한 client_secret 뿐이며, 이것으로 브라우저가 직접 OpenAI와 WebRTC 연결을 맺는다.
-import { REALTIME_MODEL, SYSTEM_INSTRUCTIONS, RECORD_TOOL, readEnvKey } from './_voice-shared.js';
+import { REALTIME_MODEL, SYSTEM_INSTRUCTIONS, RECORD_TOOL, TIP_TOOL, readEnvKey } from './_voice-shared.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
               voice: 'alloy'
             }
           },
-          tools: [RECORD_TOOL],
+          tools: [RECORD_TOOL, TIP_TOOL],
           tool_choice: 'auto'
         }
       })

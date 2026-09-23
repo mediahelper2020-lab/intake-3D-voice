@@ -14,6 +14,7 @@
   let sessionActive = false;
   let paused = false;
   let findings = []; // {category, field, value, status, ts}
+  let tips = []; // {topic, tip} — 어르신께 보여준 일반 생활정보 (화면 표시용, 서버 저장 안 함)
   let currentCaption = '';
   let summaryResult = null;
   let remoteToken = null;
@@ -182,6 +183,7 @@
     sessionActive = false;
     paused = false;
     findings = [];
+    tips = [];
     summaryResult = null;
     remoteToken = null;
     pendingElderName = '';
@@ -270,6 +272,10 @@
         <div class="voice-panel-col">
           <h3>실시간 파악 내용</h3>
           <div class="voice-findings-list" id="voiceFindingsList"><p class="voice-empty">아직 확인된 내용이 없습니다.</p></div>
+          <div id="voiceTipsWrap" style="display:none;margin-top:14px">
+            <h3>💡 어르신께 안내한 정보</h3>
+            <div class="voice-findings-list" id="voiceTipsList"></div>
+          </div>
         </div>
       </div>
       <div class="voice-footer">
@@ -329,6 +335,27 @@
     renderFindingsList();
   }
 
+  // 진단·처방이 아닌 일반적인 생활정보를 AI가 어르신께 안내했을 때, 사회복지사도 참고할 수 있도록 보여준다.
+  function applyTip(topic, tip) {
+    if (!tip) return;
+    tips.push({ topic: topic || '', tip: String(tip) });
+    renderTipsList();
+  }
+
+  function renderTipsList() {
+    const wrap = overlayEl && overlayEl.querySelector('#voiceTipsWrap');
+    const listEl = overlayEl && overlayEl.querySelector('#voiceTipsList');
+    if (!wrap || !listEl) return;
+    if (!tips.length) {
+      wrap.style.display = 'none';
+      return;
+    }
+    wrap.style.display = '';
+    listEl.innerHTML = tips
+      .map((t) => `<div class="voice-finding-item"><span class="voice-finding-text">💡 ${esc(t.tip)}</span></div>`)
+      .join('');
+  }
+
   function togglePause() {
     paused = !paused;
     const btn = overlayEl.querySelector('#voicePauseBtn');
@@ -346,14 +373,19 @@
   }
 
   function handleFunctionCall(evt) {
-    if (evt.name !== 'record_intake_findings') return;
     let args = null;
     try {
       args = JSON.parse(evt.arguments || '{}');
     } catch {
       args = null;
     }
-    if (args && Array.isArray(args.updates)) applyUpdates(args.updates);
+    if (evt.name === 'record_intake_findings') {
+      if (args && Array.isArray(args.updates)) applyUpdates(args.updates);
+    } else if (evt.name === 'share_wellness_tip') {
+      if (args && args.tip) applyTip(args.topic, args.tip);
+    } else {
+      return;
+    }
     client.sendEvent({
       type: 'conversation.item.create',
       item: { type: 'function_call_output', call_id: evt.call_id, output: JSON.stringify({ ok: true }) }
@@ -810,6 +842,7 @@
   window.openVoiceInterview = function (startMode) {
     mode = startMode === 'existing' ? 'existing' : 'new';
     findings = [];
+    tips = [];
     summaryResult = null;
     remoteToken = null;
     pendingElderName = '';
@@ -821,6 +854,7 @@
   window.openRemoteConsult = function (startMode) {
     mode = startMode === 'existing' ? 'existing' : 'new';
     findings = [];
+    tips = [];
     summaryResult = null;
     remoteToken = null;
     pendingElderName = '';
