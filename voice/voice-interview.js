@@ -19,6 +19,23 @@
   let remoteToken = null;
   let remotePollTimer = null;
   let greetingSent = false; // AI가 연결 직후 먼저 인사를 건네도록 한 번만 트리거
+  let wrapupTimer = null;
+  let hardCutoffTimer = null;
+  const MAX_CALL_MS = 5 * 60 * 1000; // 통화 최대 길이
+  const WRAPUP_AT_MS = 4 * 60 * 1000; // 이 시점에 AI가 스스로 마무리를 시작하도록 안내
+  const WRAPUP_NUDGE =
+    '지금까지 대화를 잘 나누셨습니다. 이제 새로운 주제를 새로 꺼내지 말고, 1분 안에 자연스럽게 대화를 마무리해주세요. 오늘 나눠주신 이야기에 짧게 감사 인사를 전하고, 담당 선생님께 잘 전달하겠다고 안내하며 대화를 끝내주세요.';
+
+  function clearCallTimers() {
+    if (wrapupTimer) {
+      clearTimeout(wrapupTimer);
+      wrapupTimer = null;
+    }
+    if (hardCutoffTimer) {
+      clearTimeout(hardCutoffTimer);
+      hardCutoffTimer = null;
+    }
+  }
   let pendingElderName = ''; // 시작 전 등록한 어르신 성함 (AI에게는 전달하지 않고, 사례 이름 등록용으로만 사용)
   let targetCaseId = null; // 원격 링크가 기존에 열려 있던 특정 사례용으로 만들어진 경우 그 사례 id
 
@@ -149,6 +166,7 @@
   }
 
   function closeOverlay() {
+    clearCallTimers();
     if (client) {
       client.disconnect();
       client = null;
@@ -386,6 +404,13 @@
             greetingSent = true;
             avatar && avatar.setThinking(true);
             client.sendEvent({ type: 'response.create' });
+            clearCallTimers();
+            wrapupTimer = setTimeout(() => {
+              if (client) client.sendEvent({ type: 'response.create', response: { instructions: WRAPUP_NUDGE } });
+            }, WRAPUP_AT_MS);
+            hardCutoffTimer = setTimeout(() => {
+              endSession('completed');
+            }, MAX_CALL_MS);
           }
         } else if (state === 'failed' || state === 'disconnected') {
           if (sessionActive) setStatus('error', '연결이 끊어졌습니다');
@@ -429,6 +454,7 @@
 
   // ---------- 3. 종료 처리 ----------
   async function endSession(reason) {
+    clearCallTimers();
     if (client) {
       client.disconnect();
       client = null;

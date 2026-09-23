@@ -5,6 +5,28 @@
   'use strict';
 
   const root = () => document.getElementById('rcRoot');
+  const MAX_CALL_MS = 5 * 60 * 1000; // 통화 최대 길이
+  const WRAPUP_AT_MS = 4 * 60 * 1000; // 이 시점에 AI가 스스로 마무리를 시작하도록 안내
+  const WRAPUP_NUDGE =
+    '지금까지 대화를 잘 나누셨습니다. 이제 새로운 주제를 새로 꺼내지 말고, 1분 안에 자연스럽게 대화를 마무리해주세요. 오늘 나눠주신 이야기에 짧게 감사 인사를 전하고, 담당 선생님께 잘 전달하겠다고 안내하며 대화를 끝내주세요.';
+
+  // 어르신 화면에는 구체적인 대화 내용(예: 허리 통증, 당뇨 등) 대신 어떤 주제를 나눴는지만
+  // 친근하게 보여준다. 실제 상세 내용은 findings 배열에 그대로 담겨 사회복지사에게 전달된다.
+  const FRIENDLY_TOPIC_LABELS = {
+    livingStatus: '🏠 생활 이야기',
+    family: '👨‍👩‍👧 가족 이야기',
+    economy: '💰 생활형편 이야기',
+    health: '💛 건강 이야기',
+    disability: '💛 건강 이야기',
+    emotional: '😊 마음 이야기',
+    socialRelation: '🤝 이웃 이야기',
+    serviceUsage: '🛎 이용 서비스 이야기',
+    difficulty: '💭 요즘 어려움 이야기',
+    desiredSupport: '🙏 바라시는 도움 이야기',
+    strength: '🌟 좋은 점 이야기',
+    other: '💬 그 밖의 이야기'
+  };
+
   let token = '';
   let client = null;
   let avatar = null;
@@ -12,6 +34,19 @@
   let currentCaption = '';
   let ended = false;
   let greetingSent = false;
+  let wrapupTimer = null;
+  let hardCutoffTimer = null;
+
+  function clearCallTimers() {
+    if (wrapupTimer) {
+      clearTimeout(wrapupTimer);
+      wrapupTimer = null;
+    }
+    if (hardCutoffTimer) {
+      clearTimeout(hardCutoffTimer);
+      hardCutoffTimer = null;
+    }
+  }
 
   function getToken() {
     const params = new URLSearchParams(location.search);
@@ -54,24 +89,33 @@
     root().innerHTML = `
       <div class="rc-avatar-area" id="rcAvatarArea"></div>
       <div class="rc-findings" id="rcFindingsWrap">
-        <h3>지금까지 이야기 나눈 내용</h3>
-        <div id="rcFindingsList" class="voice-findings-list"><p class="voice-empty">아직 없습니다.</p></div>
+        <h3>지금까지 나눈 이야기</h3>
+        <div id="rcFindingsList" class="rc-topics"><p class="voice-empty">아직 없습니다.</p></div>
       </div>
       <button type="button" class="rc-btn rc-btn-secondary" id="rcEnd">상담 마치기</button>`;
     avatar = window.AvatarAdapter.create(document.getElementById('rcAvatarArea'));
     document.getElementById('rcEnd').onclick = () => finishSession('completed');
   }
 
+  // 구체적인 답변 내용이 아니라 "어떤 주제로 이야기를 나눴는지"만 어르신께 보여준다.
   function renderFindings() {
     const el = document.getElementById('rcFindingsList');
     if (!el) return;
-    if (!findings.length) {
+    const seen = new Set();
+    const topics = [];
+    findings.forEach((f) => {
+      if (f.category === 'followUp') return; // 직원 확인용 메모는 어르신 화면에 노출하지 않는다
+      const label = FRIENDLY_TOPIC_LABELS[f.category] || FRIENDLY_TOPIC_LABELS.other;
+      if (!seen.has(label)) {
+        seen.add(label);
+        topics.push(label);
+      }
+    });
+    if (!topics.length) {
       el.innerHTML = '<p class="voice-empty">아직 없습니다.</p>';
       return;
     }
-    el.innerHTML = findings
-      .map((f) => `<div class="voice-finding-item"><span class="${f.status === 'confirmed' ? 'voice-mark-ok' : 'voice-mark-check'}">${f.status === 'confirmed' ? '✓' : '?'}</span><span class="voice-finding-text">${esc(f.value)}</span></div>`)
-      .join('');
+    el.innerHTML = topics.map((t) => `<span class="rc-topic-chip">${esc(t)}</span>`).join('');
   }
 
   function applyUpdates(updates) {
@@ -143,6 +187,13 @@
           greetingSent = true;
           avatar && avatar.setThinking(true);
           client.sendEvent({ type: 'response.create' });
+          clearCallTimers();
+          wrapupTimer = setTimeout(() => {
+            if (client) client.sendEvent({ type: 'response.create', response: { instructions: WRAPUP_NUDGE } });
+          }, WRAPUP_AT_MS);
+          hardCutoffTimer = setTimeout(() => {
+            finishSession('completed');
+          }, MAX_CALL_MS);
         }
       }
     });
@@ -169,6 +220,7 @@
   async function finishSession(reason) {
     if (ended) return;
     ended = true;
+    clearCallTimers();
     if (client) {
       client.disconnect();
       client = null;
