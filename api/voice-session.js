@@ -30,9 +30,15 @@ export default async function handler(req, res) {
           type: 'realtime',
           model: REALTIME_MODEL,
           instructions: SYSTEM_INSTRUCTIONS,
-          voice: 'alloy',
-          turn_detection: { type: 'server_vad' },
-          input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },
+          audio: {
+            input: {
+              transcription: { model: 'gpt-4o-mini-transcribe' },
+              turn_detection: { type: 'server_vad' }
+            },
+            output: {
+              voice: 'alloy'
+            }
+          },
           tools: [RECORD_TOOL],
           tool_choice: 'auto'
         }
