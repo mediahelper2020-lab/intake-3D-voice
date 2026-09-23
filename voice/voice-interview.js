@@ -209,12 +209,12 @@
           ? `<label class="field">어르신 성함 (Case-IN 목록 등록용, AI에게 전달되지 않음)<input type="text" id="voiceElderName" placeholder="예: 김OO"></label>`
           : `<p class="help">대상: <b>${esc(existingName || '이름 미입력')}</b></p>`}
         <div class="notice voice-consent-notice">
-          <p>· 이 대화는 <b>정식 초기면접이 아니라</b>, 담당 사회복지사가 방문·상담하기 전에 어르신 상황을 미리 파악하기 위한 사전 상담입니다. 정식 초기면접(개인정보 확인 포함)은 담당 선생님이 직접 진행합니다.</p>
-          <p>· 오늘 하루 지내신 이야기, 건강, 기분, 가족·이웃과의 관계, 요즘 힘든 점 등을 편하게 나누며, AI는 필요한 내용만 구조화하여 화면에 표시합니다.</p>
-          <p>· <b>주민등록번호·상세 주소·전화번호·계좌번호·성함 등 개인정보는 묻지 않으며, AI에게 전달되지도 않습니다.</b></p>
-          <p>· 음성 원본은 저장되지 않으며, 대화 전문도 별도로 영구 저장되지 않습니다.</p>
-          <p>· AI가 파악한 내용은 사회복지사가 검토·수정한 뒤에만 Case-IN 기록에 참고자료로 반영됩니다. AI는 진단이나 서비스 적격 여부를 판단하지 않습니다.</p>
-          <p>· 언제든지 화면의 <b>[직원에게 전환]</b> 버튼으로 AI 대화를 중단하고 직원에게 도움을 요청할 수 있습니다.</p>
+          <p>이 대화는 <b>정식 초기면접이 아니라</b>, 담당 사회복지사가 방문·상담하기 전에 어르신 상황을 미리 파악하기 위한 사전 상담입니다. 정식 초기면접(개인정보 확인 포함)은 담당 선생님이 직접 진행합니다.</p>
+          <p>오늘 하루 지내신 이야기, 건강, 기분, 가족·이웃과의 관계, 요즘 힘든 점 등을 편하게 나누며, AI는 필요한 내용만 구조화하여 화면에 표시합니다.</p>
+          <p><b>주민등록번호·상세 주소·전화번호·계좌번호·성함 등 개인정보는 묻지 않으며, AI에게 전달되지도 않습니다.</b></p>
+          <p>음성 원본은 저장되지 않으며, 대화 전문도 별도로 영구 저장되지 않습니다.</p>
+          <p>AI가 파악한 내용은 사회복지사가 검토·수정한 뒤에만 Case-IN 기록에 참고자료로 반영됩니다. AI는 진단이나 서비스 적격 여부를 판단하지 않습니다.</p>
+          <p>언제든지 화면의 <b>[직원에게 전환]</b> 버튼으로 AI 대화를 중단하고 직원에게 도움을 요청할 수 있습니다.</p>
         </div>
         <label class="voice-consent-check"><input type="checkbox" id="voiceConsentCheck"> 위 내용을 확인하였으며, 마이크 사용 및 AI 사전 상담 진행에 동의합니다.</label>
         <div class="actions voice-consent-actions">
@@ -469,7 +469,7 @@
     body.innerHTML = `
       <div class="voice-review">
         <h2>AI 사전 상담 결과 — 사회복지사 검토</h2>
-        <p class="help">이 내용은 정식 초기면접 전에 참고하는 사전 정보입니다. 체크한 항목만 Case-IN에 반영됩니다(기본은 모두 해제되어 있습니다). AI는 진단이나 서비스 적격 여부를 판정하지 않았습니다.</p>
+        <p class="help">이 내용은 정식 초기면접 전에 참고하는 사전 정보입니다. 체크한 항목만 Case-IN에 반영됩니다 — 대화 중 명확히 확인된 내용(✓)은 기본으로 체크되어 있고, 애매한 내용(?)만 직접 확인 후 체크해 주세요. AI는 진단이나 서비스 적격 여부를 판정하지 않았습니다.</p>
 
         ${summary && !summary.error ? renderSummaryBlock(summary) : summary && summary.error ? `<div class="notice">브리핑 생성에 실패했습니다: ${esc(summary.error)}</div>` : ''}
 
@@ -533,17 +533,19 @@
   function renderMappedRow(row, i) {
     const { finding, matched } = row;
     const optionText = matched.kind === 'single' ? matched.matchedOption : matched.matchedOptions.join(', ');
-    // 사전 상담 단계의 추정 값이므로 기본값은 항상 미체크로 두고, 사회복지사가 직접 확인 후 선택하게 한다.
-    return `<div class="voice-review-row">
-      <label><input type="checkbox" data-mapped-idx="${i}">
+    // 대화 중 명확히 확인된(confirmed) 내용은 기본으로 체크해두고, 애매한(needs_confirmation)
+    // 내용만 사회복지사가 직접 확인하도록 미체크로 둔다.
+    const checkedDefault = finding.status === 'confirmed';
+    return `<div class="voice-review-row${checkedDefault ? ' voice-row-confirmed' : ''}">
+      <label><span class="voice-toggle"><input type="checkbox" data-mapped-idx="${i}" ${checkedDefault ? 'checked' : ''}><span class="voice-toggle-track"></span></span>
       <b>${esc(matched.label)}</b> → <input type="text" data-mapped-value="${i}" value="${esc(optionText)}"></label>
-      <span class="voice-review-source">근거: "${esc(finding.value)}"</span>
+      <span class="voice-review-source">${checkedDefault ? '✓ 확인됨 · ' : '? 추가 확인 필요 · '}근거: "${esc(finding.value)}"</span>
     </div>`;
   }
 
   function renderScoringRow(c, i) {
     return `<div class="voice-review-row">
-      <label><input type="checkbox" data-scoring-idx="${i}">
+      <label><span class="voice-toggle"><input type="checkbox" data-scoring-idx="${i}"><span class="voice-toggle-track"></span></span>
       <b>${esc(c.domain)} · ${esc(c.label)}</b> → ${esc(c.optionText)}</label>
       <span class="voice-review-source">근거: "${esc(c.sourceField)}"</span>
     </div>`;
@@ -551,7 +553,7 @@
 
   function renderNoteRow(f, i) {
     return `<div class="voice-review-row">
-      <label><input type="checkbox" data-note-idx="${i}" checked>
+      <label><span class="voice-toggle"><input type="checkbox" data-note-idx="${i}" checked><span class="voice-toggle-track"></span></span>
       <b>${esc(window.CaseInVoiceSchema.CATEGORY_LABELS[f.category] || f.category)}</b>:
       <input type="text" data-note-value="${i}" value="${esc(f.field + ' — ' + f.value)}"></label>
     </div>`;
