@@ -15,7 +15,8 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'POST') {
       const token = randomUUID();
-      const record = { token, status: 'pending', createdAt: new Date().toISOString(), completedAt: null, findings: [], summary: null };
+      const name = typeof req.body?.name === 'string' ? req.body.name.slice(0, 60) : '';
+      const record = { token, name, status: 'pending', createdAt: new Date().toISOString(), completedAt: null, findings: [], summary: null };
       await kvSet(keyFor(token), record, TTL_SECONDS);
       res.status(200).json({ token });
       return;

@@ -5,6 +5,7 @@
   'use strict';
 
   const CONSENT_KEY = 'caseInVoiceConsentAcknowledged';
+  const PENDING_LINKS_KEY = 'caseInVoicePendingLinks';
 
   let overlayEl = null;
   let client = null;
@@ -17,9 +18,133 @@
   let summaryResult = null;
   let remoteToken = null;
   let remotePollTimer = null;
+  let pendingElderName = ''; // 시작 전 등록한 어르신 성함 (AI에게는 전달하지 않고, 사례 이름 등록용으로만 사용)
+  let targetCaseId = null; // 원격 링크가 기존에 열려 있던 특정 사례용으로 만들어진 경우 그 사례 id
 
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // ---------- 대기 중인 원격 사전상담 링크 (localStorage) ----------
+  function getPendingLinks() {
+    try {
+      return JSON.parse(localStorage.getItem(PENDING_LINKS_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  function savePendingLinks(list) {
+    try {
+      localStorage.setItem(PENDING_LINKS_KEY, JSON.stringify(list));
+    } catch {}
+  }
+
+  function addPendingLink(entry) {
+    const list = getPendingLinks();
+    list.unshift(entry);
+    savePendingLinks(list);
+    renderPendingConsultList();
+  }
+
+  function removePendingLink(token) {
+    savePendingLinks(getPendingLinks().filter((e) => e.token !== token));
+    renderPendingConsultList();
+  }
+
+  function updatePendingLinkStatus(token, status) {
+    const list = getPendingLinks();
+    const entry = list.find((e) => e.token === token);
+    if (entry) {
+      entry.status = status;
+      savePendingLinks(list);
+    }
+  }
+
+  function renderPendingConsultList() {
+    const panel = document.querySelector('#pendingConsultPanel');
+    const listEl = document.querySelector('#pendingConsultList');
+    if (!panel || !listEl) return;
+    const list = getPendingLinks();
+    if (!list.length) {
+      panel.classList.add('hidden');
+      listEl.innerHTML = '';
+      return;
+    }
+    panel.classList.remove('hidden');
+    listEl.innerHTML = list
+      .map((e) => {
+        const statusLabel = e.status === 'completed' ? '검토 필요' : '응답 대기 중';
+        const statusColor = e.status === 'completed' ? 'color:#0e8e85;font-weight:800' : 'color:#8a9aa1';
+        const when = new Date(e.createdAt).toLocaleString('ko-KR');
+        return `<div class="case" data-pending-row="${esc(e.token)}">
+          <div><strong>${esc(e.name || '이름 미등록')}</strong> <small style="${statusColor}"> · ${statusLabel}</small><br><small>${esc(when)} 생성</small></div>
+          <div class="actions">
+            <button class="btn" data-pending-open="${esc(e.token)}">열기</button>
+            <button class="btn danger" data-pending-remove="${esc(e.token)}">삭제</button>
+          </div>
+        </div>`;
+      })
+      .join('');
+    listEl.querySelectorAll('[data-pending-open]').forEach((b) => {
+      b.onclick = () => openPendingConsult(b.dataset.pendingOpen);
+    });
+    listEl.querySelectorAll('[data-pending-remove]').forEach((b) => {
+      b.onclick = () => {
+        if (!confirm('이 사전상담 대기 항목을 삭제할까요? 어르신이 이미 응답했다면 그 내용도 함께 삭제됩니다.')) return;
+        const token = b.dataset.pendingRemove;
+        fetch(`/api/remote-session?token=${encodeURIComponent(token)}`, { method: 'DELETE' }).catch(() => {});
+        removePendingLink(token);
+      };
+    });
+  }
+
+  async function refreshAllPendingStatuses() {
+    const list = getPendingLinks();
+    await Promise.all(
+      list.map(async (e) => {
+        try {
+          const res = await fetch(`/api/remote-session?token=${encodeURIComponent(e.token)}`);
+          if (!res.ok) return;
+          const record = await res.json();
+          updatePendingLinkStatus(e.token, record.status);
+        } catch {
+          /* 네트워크 오류 시 이 항목은 건너뛰고 다음 항목을 계속 확인한다 */
+        }
+      })
+    );
+    renderPendingConsultList();
+  }
+
+  async function openPendingConsult(token) {
+    const list = getPendingLinks();
+    const entry = list.find((e) => e.token === token);
+    if (!entry) return;
+    try {
+      const res = await fetch(`/api/remote-session?token=${encodeURIComponent(token)}`);
+      const record = await res.json();
+      if (!res.ok) {
+        alert(record.error || '조회에 실패했습니다.');
+        return;
+      }
+      remoteToken = token;
+      targetCaseId = entry.caseId || null;
+      pendingElderName = record.name || entry.name || '';
+      overlayEl = buildShell();
+      if (record.status === 'completed') {
+        updatePendingLinkStatus(token, 'completed');
+        findings = Array.isArray(record.findings) ? record.findings : [];
+        summaryResult = record.summary || null;
+        mode = targetCaseId && typeof records !== 'undefined' && records.some((r) => r.id === targetCaseId) ? 'existing' : 'new';
+        renderReviewScreen(summaryResult);
+      } else {
+        mode = 'new';
+        const link = `${location.origin}/pre-consult.html?t=${encodeURIComponent(token)}`;
+        renderRemoteWaiting(link);
+      }
+    } catch (err) {
+      alert('불러오는 중 오류가 발생했습니다: ' + err.message);
+    }
   }
 
   function closeOverlay() {
@@ -40,6 +165,8 @@
     findings = [];
     summaryResult = null;
     remoteToken = null;
+    pendingElderName = '';
+    targetCaseId = null;
   }
 
   function buildShell() {
@@ -72,14 +199,19 @@
 
   // ---------- 1. 동의 화면 ----------
   function renderConsentScreen() {
+    const needsName = mode === 'new';
+    const existingName = mode === 'existing' && typeof current !== 'undefined' && current ? current.data.name || '' : '';
     const body = overlayEl.querySelector('#voiceBody');
     body.innerHTML = `
       <div class="voice-consent">
         <h2>AI 사전 상담을 시작하기 전에</h2>
+        ${needsName
+          ? `<label class="field">어르신 성함 (Case-IN 목록 등록용, AI에게 전달되지 않음)<input type="text" id="voiceElderName" placeholder="예: 김OO"></label>`
+          : `<p class="help">대상: <b>${esc(existingName || '이름 미입력')}</b></p>`}
         <div class="notice voice-consent-notice">
           <p>· 이 대화는 <b>정식 초기면접이 아니라</b>, 담당 사회복지사가 방문·상담하기 전에 어르신 상황을 미리 파악하기 위한 사전 상담입니다. 정식 초기면접(개인정보 확인 포함)은 담당 선생님이 직접 진행합니다.</p>
           <p>· 오늘 하루 지내신 이야기, 건강, 기분, 가족·이웃과의 관계, 요즘 힘든 점 등을 편하게 나누며, AI는 필요한 내용만 구조화하여 화면에 표시합니다.</p>
-          <p>· <b>주민등록번호·상세 주소·전화번호·계좌번호 등 개인정보는 묻지 않으며, AI에게 전달되지도 않습니다.</b></p>
+          <p>· <b>주민등록번호·상세 주소·전화번호·계좌번호·성함 등 개인정보는 묻지 않으며, AI에게 전달되지도 않습니다.</b></p>
           <p>· 음성 원본은 저장되지 않으며, 대화 전문도 별도로 영구 저장되지 않습니다.</p>
           <p>· AI가 파악한 내용은 사회복지사가 검토·수정한 뒤에만 Case-IN 기록에 참고자료로 반영됩니다. AI는 진단이나 서비스 적격 여부를 판단하지 않습니다.</p>
           <p>· 언제든지 화면의 <b>[직원에게 전환]</b> 버튼으로 AI 대화를 중단하고 직원에게 도움을 요청할 수 있습니다.</p>
@@ -92,11 +224,16 @@
       </div>`;
     const check = body.querySelector('#voiceConsentCheck');
     const startBtn = body.querySelector('#voiceConsentStart');
-    check.onchange = () => {
-      startBtn.disabled = !check.checked;
-    };
+    const nameInput = body.querySelector('#voiceElderName');
+    function refreshStartEnabled() {
+      const nameOk = !needsName || (nameInput && nameInput.value.trim());
+      startBtn.disabled = !(check.checked && nameOk);
+    }
+    check.onchange = refreshStartEnabled;
+    if (nameInput) nameInput.oninput = refreshStartEnabled;
     body.querySelector('#voiceConsentCancel').onclick = closeOverlay;
     startBtn.onclick = () => {
+      pendingElderName = needsName ? nameInput.value.trim() : existingName;
       try {
         localStorage.setItem(CONSENT_KEY, '1');
       } catch {}
@@ -425,9 +562,20 @@
     const scoringCandidates = body.__scoringCandidates;
     const unmatched = body.__unmatched;
 
+    if (mode === 'existing' && targetCaseId && typeof records !== 'undefined') {
+      const existingRecord = records.find((r) => r.id === targetCaseId);
+      if (existingRecord) {
+        current = existingRecord;
+      } else {
+        mode = 'new'; // 대상 사례가 그 사이 삭제된 경우 새 사례로 대체 생성
+      }
+    }
     if (mode === 'new') {
       const newBtn = document.querySelector('#new');
       if (newBtn) newBtn.click(); // 기존 앱의 신규 사례 생성 로직을 그대로 재사용
+      if (typeof current !== 'undefined' && current && pendingElderName) {
+        current.data.name = pendingElderName;
+      }
     }
     if (typeof current === 'undefined' || !current) {
       alert('저장할 사례를 찾을 수 없습니다.');
@@ -482,6 +630,7 @@
         if (tokenToPurge) {
           // 서버에는 확인 전까지만 임시 보관한다. 저장이 끝나면 즉시 삭제한다(개인정보 최소 보관 원칙).
           fetch(`/api/remote-session?token=${encodeURIComponent(tokenToPurge)}`, { method: 'DELETE' }).catch(() => {});
+          removePendingLink(tokenToPurge);
         }
       })
       .catch((err) => {
@@ -489,32 +638,50 @@
       });
   }
 
-  // ---------- 5. 문자로 사전상담 보내기 (원격) ----------
+  // ---------- 5. 사전 상담 링크 만들기 (원격) ----------
   function renderRemoteSendScreen() {
+    const needsName = mode === 'new';
+    const existingName = mode === 'existing' && typeof current !== 'undefined' && current ? current.data.name || '' : '';
     const body = overlayEl.querySelector('#voiceBody');
     body.innerHTML = `
       <div class="voice-consent">
         <h2>사전 상담 링크 만들기</h2>
-        <p class="help">버튼을 누르면 어르신이 직접 열어볼 수 있는 사전 상담 링크가 만들어집니다. 이 링크를 문자·카카오톡·이메일 등 원하시는 방법으로 직접 전달해 주세요. 어르신이 대화를 마치면 그 결과가 이 화면으로 전달됩니다. 사회복지사가 확인·수정한 뒤에만 Case-IN에 저장됩니다.</p>
+        ${needsName
+          ? `<label class="field">어르신 성함 (Case-IN 목록 등록용, AI에게 전달되지 않음)<input type="text" id="rcElderName" placeholder="예: 김OO"></label>`
+          : `<p class="help">대상: <b>${esc(existingName || '이름 미입력')}</b></p>`}
+        <p class="help">버튼을 누르면 어르신이 직접 열어볼 수 있는 사전 상담 링크가 만들어집니다. 이 링크를 문자·카카오톡·이메일 등 원하시는 방법으로 직접 전달해 주세요. 어르신이 대화를 마치면 홈 화면의 "사전상담 진행 현황"에 자동으로 표시됩니다. 사회복지사가 확인·수정한 뒤에만 Case-IN에 저장됩니다.</p>
         <div class="actions voice-consent-actions">
           <button type="button" class="btn" id="rcCancel">취소</button>
-          <button type="button" class="btn primary voice-btn-lg" id="rcCreate">링크 만들기</button>
+          <button type="button" class="btn primary voice-btn-lg" id="rcCreate" ${needsName ? 'disabled' : ''}>링크 만들기</button>
         </div>
       </div>`;
+    const nameInput = body.querySelector('#rcElderName');
+    const createBtn = body.querySelector('#rcCreate');
+    if (nameInput) {
+      nameInput.oninput = () => {
+        createBtn.disabled = !nameInput.value.trim();
+      };
+    }
     body.querySelector('#rcCancel').onclick = closeOverlay;
-    body.querySelector('#rcCreate').onclick = createRemoteLink;
+    createBtn.onclick = () => createRemoteLink(needsName ? nameInput.value.trim() : existingName);
   }
 
-  async function createRemoteLink() {
+  async function createRemoteLink(elderName) {
     const body = overlayEl.querySelector('#voiceBody');
     const createBtn = body.querySelector('#rcCreate');
     createBtn.disabled = true;
     createBtn.textContent = '만드는 중…';
     try {
-      const createRes = await fetch('/api/remote-session', { method: 'POST' });
+      const createRes = await fetch('/api/remote-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: elderName })
+      });
       const createPayload = await createRes.json();
       if (!createRes.ok) throw new Error(createPayload.error || '링크 생성에 실패했습니다.');
       remoteToken = createPayload.token;
+      const caseIdAtCreation = mode === 'existing' && typeof current !== 'undefined' && current ? current.id : null;
+      addPendingLink({ token: remoteToken, name: elderName, caseId: caseIdAtCreation, createdAt: Date.now(), status: 'pending' });
       const link = `${location.origin}/pre-consult.html?t=${encodeURIComponent(remoteToken)}`;
       renderRemoteWaiting(link);
     } catch (err) {
@@ -589,6 +756,8 @@
           clearInterval(remotePollTimer);
           remotePollTimer = null;
         }
+        updatePendingLinkStatus(remoteToken, 'completed');
+        pendingElderName = record.name || pendingElderName;
         findings = Array.isArray(record.findings) ? record.findings : [];
         summaryResult = record.summary || null;
         renderReviewScreen(summaryResult);
@@ -607,6 +776,8 @@
     findings = [];
     summaryResult = null;
     remoteToken = null;
+    pendingElderName = '';
+    targetCaseId = null;
     overlayEl = buildShell();
     renderConsentScreen();
   };
@@ -616,7 +787,20 @@
     findings = [];
     summaryResult = null;
     remoteToken = null;
+    pendingElderName = '';
+    targetCaseId = null;
     overlayEl = buildShell();
     renderRemoteSendScreen();
   };
+
+  const refreshAllBtn = document.querySelector('#pendingConsultRefreshAll');
+  if (refreshAllBtn) {
+    refreshAllBtn.onclick = () => {
+      refreshAllBtn.disabled = true;
+      refreshAllPendingStatuses().finally(() => {
+        refreshAllBtn.disabled = false;
+      });
+    };
+  }
+  renderPendingConsultList();
 })();
