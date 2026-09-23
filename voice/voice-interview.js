@@ -15,6 +15,8 @@
   let findings = []; // {category, field, value, status, ts}
   let currentCaption = '';
   let summaryResult = null;
+  let remoteToken = null;
+  let remotePollTimer = null;
 
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -25,6 +27,10 @@
       client.disconnect();
       client = null;
     }
+    if (remotePollTimer) {
+      clearInterval(remotePollTimer);
+      remotePollTimer = null;
+    }
     if (overlayEl) {
       overlayEl.remove();
       overlayEl = null;
@@ -33,6 +39,7 @@
     paused = false;
     findings = [];
     summaryResult = null;
+    remoteToken = null;
   }
 
   function buildShell() {
@@ -465,16 +472,115 @@
       current.data.voiceInterviewSummary = summaryResult;
     }
 
+    const tokenToPurge = remoteToken;
     saveCase()
       .then(() => {
         tab = 0;
         renderEditor();
         alert('AI 사전 상담 결과가 저장되었습니다. 정식 초기면접은 담당 사회복지사가 이어서 진행해 주세요.');
         closeOverlay();
+        if (tokenToPurge) {
+          // 서버에는 확인 전까지만 임시 보관한다. 저장이 끝나면 즉시 삭제한다(개인정보 최소 보관 원칙).
+          fetch(`/api/remote-session?token=${encodeURIComponent(tokenToPurge)}`, { method: 'DELETE' }).catch(() => {});
+        }
       })
       .catch((err) => {
         alert('저장 중 오류가 발생했습니다: ' + err.message);
       });
+  }
+
+  // ---------- 5. 문자로 사전상담 보내기 (원격) ----------
+  function renderRemoteSendScreen() {
+    const body = overlayEl.querySelector('#voiceBody');
+    body.innerHTML = `
+      <div class="voice-consent">
+        <h2>어르신께 사전 상담 링크 문자 보내기</h2>
+        <p class="help">어르신 휴대폰으로 링크를 보내면, 어르신이 직접 AI와 편하게 대화한 뒤 그 결과가 이 화면으로 전달됩니다. 사회복지사가 확인·수정한 뒤에만 Case-IN에 저장됩니다.</p>
+        <label class="field">어르신 휴대폰 번호<input type="tel" id="rcPhone" placeholder="010-0000-0000"></label>
+        <div class="actions voice-consent-actions">
+          <button type="button" class="btn" id="rcCancel">취소</button>
+          <button type="button" class="btn primary voice-btn-lg" id="rcSend">문자 발송</button>
+        </div>
+      </div>`;
+    body.querySelector('#rcCancel').onclick = closeOverlay;
+    body.querySelector('#rcSend').onclick = sendRemoteLink;
+  }
+
+  async function sendRemoteLink() {
+    const body = overlayEl.querySelector('#voiceBody');
+    const phoneInput = body.querySelector('#rcPhone');
+    const phone = phoneInput.value.trim();
+    if (!phone) {
+      alert('휴대폰 번호를 입력해 주세요.');
+      return;
+    }
+    const sendBtn = body.querySelector('#rcSend');
+    sendBtn.disabled = true;
+    sendBtn.textContent = '발송 중…';
+    try {
+      const createRes = await fetch('/api/remote-session', { method: 'POST' });
+      const createPayload = await createRes.json();
+      if (!createRes.ok) throw new Error(createPayload.error || '세션 생성에 실패했습니다.');
+      remoteToken = createPayload.token;
+      const link = `${location.origin}/pre-consult.html?t=${encodeURIComponent(remoteToken)}`;
+
+      const smsRes = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, link })
+      });
+      const smsPayload = await smsRes.json();
+      if (!smsRes.ok) throw new Error(smsPayload.error || '문자 발송에 실패했습니다.');
+
+      renderRemoteWaiting(link);
+    } catch (err) {
+      alert(err.message);
+      sendBtn.disabled = false;
+      sendBtn.textContent = '문자 발송';
+    }
+  }
+
+  function renderRemoteWaiting(link) {
+    const body = overlayEl.querySelector('#voiceBody');
+    body.innerHTML = `
+      <div class="voice-consent">
+        <h2>발송 완료 · 응답 대기 중</h2>
+        <div class="notice">문자가 발송되었습니다. 어르신이 링크를 눌러 대화를 마치면 자동으로 알려드립니다.</div>
+        <p class="help">문자가 도착하지 않았다면 이 링크를 직접 전달하셔도 됩니다:<br><code>${esc(link)}</code></p>
+        <p class="voice-empty" id="rcWaitingStatus">대기 중…</p>
+        <div class="actions voice-consent-actions">
+          <button type="button" class="btn" id="rcWaitCancel">닫기 (백그라운드에서 계속 대기)</button>
+          <button type="button" class="btn primary voice-btn-lg" id="rcRefresh">지금 확인</button>
+        </div>
+      </div>`;
+    body.querySelector('#rcWaitCancel').onclick = closeOverlay;
+    body.querySelector('#rcRefresh').onclick = () => checkRemoteStatus(true);
+
+    if (remotePollTimer) clearInterval(remotePollTimer);
+    remotePollTimer = setInterval(() => checkRemoteStatus(false), 10000);
+  }
+
+  async function checkRemoteStatus(manual) {
+    if (!remoteToken) return;
+    try {
+      const res = await fetch(`/api/remote-session?token=${encodeURIComponent(remoteToken)}`);
+      const record = await res.json();
+      if (!res.ok) throw new Error(record.error || '조회 실패');
+      if (record.status === 'completed') {
+        if (remotePollTimer) {
+          clearInterval(remotePollTimer);
+          remotePollTimer = null;
+        }
+        findings = Array.isArray(record.findings) ? record.findings : [];
+        summaryResult = record.summary || null;
+        renderReviewScreen(summaryResult);
+      } else if (manual) {
+        const statusEl = overlayEl && overlayEl.querySelector('#rcWaitingStatus');
+        if (statusEl) statusEl.textContent = '아직 어르신이 상담을 마치지 않으셨습니다. (자동으로 계속 확인 중)';
+      }
+    } catch (err) {
+      if (manual) alert('상태 확인 중 오류: ' + err.message);
+    }
   }
 
   // ---------- 진입점 ----------
@@ -482,7 +588,17 @@
     mode = startMode === 'existing' ? 'existing' : 'new';
     findings = [];
     summaryResult = null;
+    remoteToken = null;
     overlayEl = buildShell();
     renderConsentScreen();
+  };
+
+  window.openRemoteConsult = function (startMode) {
+    mode = startMode === 'existing' ? 'existing' : 'new';
+    findings = [];
+    summaryResult = null;
+    remoteToken = null;
+    overlayEl = buildShell();
+    renderRemoteSendScreen();
   };
 })();

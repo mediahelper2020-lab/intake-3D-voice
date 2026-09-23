@@ -1,15 +1,20 @@
 // Case-IN Voice — 아바타 어댑터
-// 1차 개발에서는 간단한 CSS 기반 placeholder 아바타를 사용하고, 추후 외부 아바타 API로
-// 쉽게 교체할 수 있도록 speak/stop/setListening/setThinking/setSpeaking 인터페이스만 노출한다.
-// Case-IN 핵심 로직(voice-interview.js)은 이 인터페이스에만 의존하며 내부 구현을 모른다.
+// 실제 상담원 사진을 얼굴로 사용하되, 진짜 사람과 혼동되지 않도록 "AI 상담원입니다" 배지를 항상 표시하고
+// 상태(듣는 중/생각 중/말하는 중 등)는 사진 테두리의 색·움직임으로 표현한다(실시간 립싱크 영상이 아님).
+// speak/stop/setListening/setThinking/setSpeaking/setPaused/setError 인터페이스만 지키면 되므로,
+// 추후 실시간 영상 아바타 API로 이 파일만 교체해 넣을 수 있다. Case-IN 핵심 로직은 이 내부 구현을 모른다.
 (function () {
   'use strict';
 
-  function createPlaceholderAvatar(rootEl) {
+  const AVATAR_IMAGE_SRC = 'avatar/consultant.jpg';
+
+  function createPhotoAvatar(rootEl) {
     rootEl.innerHTML =
       '<div class="voice-avatar-face" data-state="idle">' +
-      '<span class="voice-avatar-emoji">🙂</span>' +
-      '<span class="voice-avatar-ring"></span>' +
+      '<span class="voice-avatar-photo-ring">' +
+      '<img class="voice-avatar-photo" src="' + AVATAR_IMAGE_SRC + '" alt="AI 상담원 아바타" draggable="false">' +
+      '</span>' +
+      '<span class="voice-avatar-ai-badge">AI 상담원입니다</span>' +
       '</div>' +
       '<p class="voice-avatar-caption" id="voiceAvatarCaption">편하게 말씀해 주세요.</p>';
 
@@ -47,5 +52,5 @@
     };
   }
 
-  window.AvatarAdapter = { create: createPlaceholderAvatar };
+  window.AvatarAdapter = { create: createPhotoAvatar };
 })();
