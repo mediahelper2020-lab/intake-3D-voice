@@ -141,6 +141,7 @@
     difficulty: '현재 어려움',
     desiredSupport: '희망하는 지원',
     strength: '강점 및 자원',
+    followUp: '방문 시 직접 확인할 사항',
     other: '추가 확인사항'
   };
 

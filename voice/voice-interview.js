@@ -40,9 +40,9 @@
     el.id = 'voiceOverlay';
     el.className = 'voice-overlay';
     el.innerHTML = `
-      <div class="voice-modal" role="dialog" aria-modal="true" aria-label="Case-IN Voice AI 초기면접">
+      <div class="voice-modal" role="dialog" aria-modal="true" aria-label="Case-IN Voice AI 사전 상담">
         <div class="voice-header">
-          <strong>Case-IN Voice</strong>
+          <strong>Case-IN Voice · AI 사전 상담</strong>
           <span class="voice-status" id="voiceStatus"><i class="voice-status-dot" data-state="idle"></i><span id="voiceStatusText">준비 중</span></span>
           <button type="button" class="btn voice-close" id="voiceCloseBtn" aria-label="닫기">✕</button>
         </div>
@@ -50,7 +50,7 @@
       </div>`;
     document.body.appendChild(el);
     el.querySelector('#voiceCloseBtn').onclick = () => {
-      if (!confirm('AI 초기면접을 종료할까요? 저장하지 않은 내용은 사라집니다.')) return;
+      if (!confirm('AI 사전 상담을 종료할까요? 저장하지 않은 내용은 사라집니다.')) return;
       closeOverlay();
     };
     return el;
@@ -68,15 +68,16 @@
     const body = overlayEl.querySelector('#voiceBody');
     body.innerHTML = `
       <div class="voice-consent">
-        <h2>AI 음성 초기면접을 시작하기 전에</h2>
+        <h2>AI 사전 상담을 시작하기 전에</h2>
         <div class="notice voice-consent-notice">
-          <p>· AI와의 음성 대화로 초기면접 정보를 수집하며, 대화 내용 중 필요한 항목만 구조화되어 화면에 표시됩니다.</p>
+          <p>· 이 대화는 <b>정식 초기면접이 아니라</b>, 담당 사회복지사가 방문·상담하기 전에 어르신 상황을 미리 파악하기 위한 사전 상담입니다. 정식 초기면접(개인정보 확인 포함)은 담당 선생님이 직접 진행합니다.</p>
+          <p>· 오늘 하루 지내신 이야기, 건강, 기분, 가족·이웃과의 관계, 요즘 힘든 점 등을 편하게 나누며, AI는 필요한 내용만 구조화하여 화면에 표시합니다.</p>
+          <p>· <b>주민등록번호·상세 주소·전화번호·계좌번호 등 개인정보는 묻지 않으며, AI에게 전달되지도 않습니다.</b></p>
           <p>· 음성 원본은 저장되지 않으며, 대화 전문도 별도로 영구 저장되지 않습니다.</p>
-          <p>· 주민등록번호·상세 주소·전화번호 등은 AI에게 전달되지 않으며, 화면에서 직접 입력해야 합니다.</p>
-          <p>· AI가 파악한 내용은 사회복지사가 검토·수정한 뒤에만 최종 기록으로 저장됩니다. AI는 진단이나 서비스 적격 여부를 판단하지 않습니다.</p>
+          <p>· AI가 파악한 내용은 사회복지사가 검토·수정한 뒤에만 Case-IN 기록에 참고자료로 반영됩니다. AI는 진단이나 서비스 적격 여부를 판단하지 않습니다.</p>
           <p>· 언제든지 화면의 <b>[직원에게 전환]</b> 버튼으로 AI 대화를 중단하고 직원에게 도움을 요청할 수 있습니다.</p>
         </div>
-        <label class="voice-consent-check"><input type="checkbox" id="voiceConsentCheck"> 위 내용을 확인하였으며, 마이크 사용 및 AI 음성 상담 진행에 동의합니다.</label>
+        <label class="voice-consent-check"><input type="checkbox" id="voiceConsentCheck"> 위 내용을 확인하였으며, 마이크 사용 및 AI 사전 상담 진행에 동의합니다.</label>
         <div class="actions voice-consent-actions">
           <button type="button" class="btn" id="voiceConsentCancel">취소</button>
           <button type="button" class="btn primary voice-btn-lg" id="voiceConsentStart" disabled>동의하고 시작</button>
@@ -110,7 +111,7 @@
       <div class="voice-footer">
         <button type="button" class="btn voice-btn-lg" id="voicePauseBtn">일시정지</button>
         <button type="button" class="btn danger voice-btn-lg" id="voiceHandoffBtn">직원에게 전환</button>
-        <button type="button" class="btn primary voice-btn-lg" id="voiceEndBtn">면접 종료</button>
+        <button type="button" class="btn primary voice-btn-lg" id="voiceEndBtn">사전상담 종료</button>
       </div>`;
     avatar = window.AvatarAdapter.create(body.querySelector('#voiceAvatarCol'));
     body.querySelector('#voicePauseBtn').onclick = togglePause;
@@ -323,12 +324,12 @@
     const body = overlayEl.querySelector('#voiceBody');
     body.innerHTML = `
       <div class="voice-review">
-        <h2>AI 초기면접 결과 — 사회복지사 검토</h2>
-        <p class="help">아래 항목을 확인·수정한 뒤 저장하세요. 체크한 항목만 Case-IN 초기면접지에 반영됩니다. AI는 진단이나 서비스 적격 여부를 판정하지 않습니다.</p>
+        <h2>AI 사전 상담 결과 — 사회복지사 검토</h2>
+        <p class="help">이 내용은 정식 초기면접 전에 참고하는 사전 정보입니다. 체크한 항목만 Case-IN에 반영됩니다(기본은 모두 해제되어 있습니다). AI는 진단이나 서비스 적격 여부를 판정하지 않았습니다.</p>
 
-        ${summary && !summary.error ? renderSummaryBlock(summary) : summary && summary.error ? `<div class="notice">요약 생성에 실패했습니다: ${esc(summary.error)}</div>` : ''}
+        ${summary && !summary.error ? renderSummaryBlock(summary) : summary && summary.error ? `<div class="notice">브리핑 생성에 실패했습니다: ${esc(summary.error)}</div>` : ''}
 
-        <h3>Case-IN 필드로 반영 가능한 항목 (${mappedRows.length})</h3>
+        <h3>Case-IN 필드에 참고로 반영할 수 있는 항목 (${mappedRows.length})</h3>
         <div class="voice-review-list" id="voiceMappedList">
           ${mappedRows.length ? mappedRows.map((r, i) => renderMappedRow(r, i)).join('') : '<p class="voice-empty">일치하는 항목이 없습니다.</p>'}
         </div>
@@ -338,14 +339,14 @@
           ${scoringCandidates.map((c, i) => renderScoringRow(c, i)).join('')}
         </div>` : ''}
 
-        <h3>추가 확인사항 (${unmatched.length})</h3>
+        <h3>방문 전 참고 메모 · 추가 확인사항 (${unmatched.length})</h3>
         <div class="voice-review-list" id="voiceNotesList">
           ${unmatched.length ? unmatched.map((f, i) => renderNoteRow(f, i)).join('') : '<p class="voice-empty">없음</p>'}
         </div>
 
         <div class="actions voice-consent-actions">
           <button type="button" class="btn" id="voiceReviewCancel">저장하지 않고 닫기</button>
-          ${!summary ? '<button type="button" class="btn" id="voiceReviewSummarize">AI 요약 생성</button>' : ''}
+          ${!summary ? '<button type="button" class="btn" id="voiceReviewSummarize">AI 브리핑 생성</button>' : ''}
           <button type="button" class="btn primary voice-btn-lg" id="voiceReviewSave">사회복지사 확인 및 저장</button>
         </div>
       </div>`;
@@ -377,7 +378,8 @@
       ['서비스 욕구', summary.serviceNeeds],
       ['강점과 자원', summary.strengths],
       ['추가 확인 필요사항', summary.needsConfirmation],
-      ['상담내용 요약', summary.summary]
+      ['방문 시 살펴볼 점', summary.visitFocus],
+      ['사전 상담 요약', summary.summary]
     ];
     return `<div class="notice voice-summary-block">${rows
       .map(([label, val]) => `<p><b>${esc(label)}</b>: ${esc(val || '확인된 내용 없음')}</p>`)
@@ -387,9 +389,9 @@
   function renderMappedRow(row, i) {
     const { finding, matched } = row;
     const optionText = matched.kind === 'single' ? matched.matchedOption : matched.matchedOptions.join(', ');
-    const checkedDefault = finding.status === 'confirmed';
+    // 사전 상담 단계의 추정 값이므로 기본값은 항상 미체크로 두고, 사회복지사가 직접 확인 후 선택하게 한다.
     return `<div class="voice-review-row">
-      <label><input type="checkbox" data-mapped-idx="${i}" ${checkedDefault ? 'checked' : ''}>
+      <label><input type="checkbox" data-mapped-idx="${i}">
       <b>${esc(matched.label)}</b> → <input type="text" data-mapped-value="${i}" value="${esc(optionText)}"></label>
       <span class="voice-review-source">근거: "${esc(finding.value)}"</span>
     </div>`;
@@ -455,7 +457,7 @@
       noteLines.push('- ' + (input ? input.value : JSON.stringify(unmatched[i])));
     });
     if (noteLines.length) {
-      const header = `[AI 초기면접 추가 확인사항 · ${new Date().toLocaleString('ko-KR')}]`;
+      const header = `[AI 사전 상담 메모 · ${new Date().toLocaleString('ko-KR')}]`;
       const prev = current.data.voiceAdditionalNotes ? current.data.voiceAdditionalNotes + '\n\n' : '';
       current.data.voiceAdditionalNotes = prev + header + '\n' + noteLines.join('\n');
     }
@@ -467,7 +469,7 @@
       .then(() => {
         tab = 0;
         renderEditor();
-        alert('AI 초기면접 결과가 저장되었습니다.');
+        alert('AI 사전 상담 결과가 저장되었습니다. 정식 초기면접은 담당 사회복지사가 이어서 진행해 주세요.');
         closeOverlay();
       })
       .catch((err) => {

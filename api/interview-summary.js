@@ -1,27 +1,29 @@
-// Vercel 서버리스 함수: AI 음성 초기면접에서 누적된 "구조화된 항목"만을 근거로
-// 면접 종료 시 표시할 요약(8개 영역)을 생성한다.
+// Vercel 서버리스 함수: AI 사전 상담에서 누적된 "구조화된 항목"만을 근거로
+// 담당 사회복지사가 정식 초기면접(방문·상담) 전에 참고할 브리핑을 생성한다.
 // 원본 음성이나 대화 전문을 받지 않고, 클라이언트가 이미 뽑아낸 구조화 데이터만 입력으로 받는다.
 import { readEnvKey } from './_voice-shared.js';
 
-const SUMMARY_SYSTEM_PROMPT = `당신은 사회복지 초기면접 기록을 정리하는 보조 도구입니다.
-입력으로 주어지는 것은 AI 음성 상담 중 이미 추출된 구조화된 항목 목록뿐입니다(원본 음성이나 대화 전문이 아닙니다).
-이 정보만을 근거로 아래 8개 영역으로 요약을 작성하세요. 목록에 없는 내용을 추측하거나 지어내지 마세요.
+const SUMMARY_SYSTEM_PROMPT = `당신은 담당 사회복지사가 정식 초기면접(방문·상담)을 나가기 전에 미리 읽어볼 "사전 상담 브리핑"을 정리하는 보조 도구입니다.
+입력으로 주어지는 것은 AI 사전 상담 중 이미 추출된 구조화된 항목 목록뿐입니다(원본 음성이나 대화 전문이 아닙니다).
+이 정보만을 근거로 아래 영역으로 브리핑을 작성하세요. 목록에 없는 내용을 추측하거나 지어내지 마세요.
 당신은 진단, 서비스 적격 판정, 사례관리 결정을 내리지 않습니다. 그런 문구를 절대 포함하지 마세요.
+이 브리핑은 정식 기록이 아니라 담당 사회복지사가 방문 전에 참고하는 사전 정보임을 유념하고, "~것으로 보임", "~라고 말씀하심"처럼 조심스러운 표현을 사용하세요.
 각 영역은 한국어로 간결한 문장 또는 항목 나열로 작성하고, 근거가 부족하면 "확인된 내용 없음"이라고 쓰세요.
 반드시 JSON으로만 응답하세요.`;
 
 const SUMMARY_SCHEMA = {
   type: 'object',
   properties: {
-    mainComplaint: { type: 'string', description: '주요 호소내용' },
+    mainComplaint: { type: 'string', description: '주요 호소내용 (어르신이 스스로 이야기한 어려움)' },
     personalNeeds: { type: 'string', description: '개인적 욕구' },
-    familyNeeds: { type: 'string', description: '가족·관계적 욕구' },
+    familyNeeds: { type: 'string', description: '가족·관계적 욕구 (실명 없이 관계 위주)' },
     healthNeeds: { type: 'string', description: '건강 관련 욕구' },
     communityNeeds: { type: 'string', description: '지역사회·환경적 욕구' },
     serviceNeeds: { type: 'string', description: '서비스 욕구' },
     strengths: { type: 'string', description: '이용자의 강점과 자원' },
-    needsConfirmation: { type: 'string', description: '추가 확인 필요사항' },
-    summary: { type: 'string', description: '상담내용 요약 (전문적 판단·서비스 결정 문구 금지)' }
+    needsConfirmation: { type: 'string', description: '내용이 모호하거나 추가로 확인이 필요한 사항' },
+    visitFocus: { type: 'string', description: '담당 사회복지사가 방문·상담 시 특히 살펴보면 좋을 점 (분위기, 정서, 관계 등)' },
+    summary: { type: 'string', description: '사전 상담 요약 (전문적 판단·서비스 결정 문구 금지, 방문 전 참고용)' }
   },
   required: [
     'mainComplaint',
@@ -32,6 +34,7 @@ const SUMMARY_SCHEMA = {
     'serviceNeeds',
     'strengths',
     'needsConfirmation',
+    'visitFocus',
     'summary'
   ],
   additionalProperties: false
