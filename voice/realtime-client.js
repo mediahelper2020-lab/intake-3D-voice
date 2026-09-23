@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  const REALTIME_SDP_URL = 'https://api.openai.com/v1/realtime';
+  const REALTIME_SDP_URL = 'https://api.openai.com/v1/realtime/calls';
 
   function RealtimeVoiceClient(handlers) {
     this.handlers = handlers || {};
@@ -64,7 +64,7 @@
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    const sdpRes = await fetch(`${REALTIME_SDP_URL}?model=${encodeURIComponent(model)}`, {
+    const sdpRes = await fetch(REALTIME_SDP_URL, {
       method: 'POST',
       body: offer.sdp,
       headers: {
@@ -74,7 +74,8 @@
     });
 
     if (!sdpRes.ok) {
-      throw new Error('OpenAI Realtime 서버와 연결하지 못했습니다.');
+      const detail = await sdpRes.text().catch(() => '');
+      throw new Error(`OpenAI Realtime 서버와 연결하지 못했습니다. (${sdpRes.status}${detail ? ' ' + detail.slice(0, 200) : ''})`);
     }
 
     const answerSdp = await sdpRes.text();
