@@ -24,7 +24,7 @@
 
 1. 이 저장소를 Vercel 프로젝트로 연결합니다. 별도 빌드 설정이 필요 없습니다(정적 파일 + `api/` 서버리스 함수).
 2. Vercel 프로젝트의 **Settings → Environment Variables**에 `OPENAI_API_KEY`를 등록합니다 (`.env.example` 참고).
-3. 원격 사전상담(링크 만들기)을 쓰시려면 Vercel **Storage → KV** 스토리지를 생성해 프로젝트에 연결하세요 (→ `KV_REST_API_URL`/`KV_REST_API_TOKEN`이 자동으로 채워집니다).
+3. 원격 사전상담(링크 만들기)을 쓰시려면 Vercel **Storage → Browse Storage**에서 **Upstash for Redis**(또는 Upstash)를 생성해 프로젝트에 연결하세요. (예전 "Vercel KV"는 단종되고 이 마켓플레이스 상품으로 대체되었습니다.) 연결하면 관련 환경변수가 자동으로 채워집니다.
 4. 배포 후 `🎙 AI 사전상담`과 `🔗 사전상담 링크 만들기` 버튼이 정상 동작하는지 확인합니다.
 
 OpenAI API 키는 절대 브라우저 코드에 포함되지 않으며, 서버 환경변수로만 존재합니다. 브라우저는 `/api/voice-session`이 발급한 단명(ephemeral) 토큰으로만 OpenAI Realtime API와 직접 연결합니다.
