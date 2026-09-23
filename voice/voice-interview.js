@@ -494,49 +494,33 @@
     const body = overlayEl.querySelector('#voiceBody');
     body.innerHTML = `
       <div class="voice-consent">
-        <h2>어르신께 사전 상담 링크 문자 보내기</h2>
-        <p class="help">어르신 휴대폰으로 링크를 보내면, 어르신이 직접 AI와 편하게 대화한 뒤 그 결과가 이 화면으로 전달됩니다. 사회복지사가 확인·수정한 뒤에만 Case-IN에 저장됩니다.</p>
-        <label class="field">어르신 휴대폰 번호<input type="tel" id="rcPhone" placeholder="010-0000-0000"></label>
+        <h2>사전 상담 링크 만들기</h2>
+        <p class="help">버튼을 누르면 어르신이 직접 열어볼 수 있는 사전 상담 링크가 만들어집니다. 이 링크를 문자·카카오톡·이메일 등 원하시는 방법으로 직접 전달해 주세요. 어르신이 대화를 마치면 그 결과가 이 화면으로 전달됩니다. 사회복지사가 확인·수정한 뒤에만 Case-IN에 저장됩니다.</p>
         <div class="actions voice-consent-actions">
           <button type="button" class="btn" id="rcCancel">취소</button>
-          <button type="button" class="btn primary voice-btn-lg" id="rcSend">문자 발송</button>
+          <button type="button" class="btn primary voice-btn-lg" id="rcCreate">링크 만들기</button>
         </div>
       </div>`;
     body.querySelector('#rcCancel').onclick = closeOverlay;
-    body.querySelector('#rcSend').onclick = sendRemoteLink;
+    body.querySelector('#rcCreate').onclick = createRemoteLink;
   }
 
-  async function sendRemoteLink() {
+  async function createRemoteLink() {
     const body = overlayEl.querySelector('#voiceBody');
-    const phoneInput = body.querySelector('#rcPhone');
-    const phone = phoneInput.value.trim();
-    if (!phone) {
-      alert('휴대폰 번호를 입력해 주세요.');
-      return;
-    }
-    const sendBtn = body.querySelector('#rcSend');
-    sendBtn.disabled = true;
-    sendBtn.textContent = '발송 중…';
+    const createBtn = body.querySelector('#rcCreate');
+    createBtn.disabled = true;
+    createBtn.textContent = '만드는 중…';
     try {
       const createRes = await fetch('/api/remote-session', { method: 'POST' });
       const createPayload = await createRes.json();
-      if (!createRes.ok) throw new Error(createPayload.error || '세션 생성에 실패했습니다.');
+      if (!createRes.ok) throw new Error(createPayload.error || '링크 생성에 실패했습니다.');
       remoteToken = createPayload.token;
       const link = `${location.origin}/pre-consult.html?t=${encodeURIComponent(remoteToken)}`;
-
-      const smsRes = await fetch('/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, link })
-      });
-      const smsPayload = await smsRes.json();
-      if (!smsRes.ok) throw new Error(smsPayload.error || '문자 발송에 실패했습니다.');
-
       renderRemoteWaiting(link);
     } catch (err) {
       alert(err.message);
-      sendBtn.disabled = false;
-      sendBtn.textContent = '문자 발송';
+      createBtn.disabled = false;
+      createBtn.textContent = '링크 만들기';
     }
   }
 
@@ -544,10 +528,15 @@
     const body = overlayEl.querySelector('#voiceBody');
     body.innerHTML = `
       <div class="voice-consent">
-        <h2>발송 완료 · 응답 대기 중</h2>
-        <div class="notice">문자가 발송되었습니다. 어르신이 링크를 눌러 대화를 마치면 자동으로 알려드립니다.</div>
-        <p class="help">문자가 도착하지 않았다면 이 링크를 직접 전달하셔도 됩니다:<br><code>${esc(link)}</code></p>
-        <p class="voice-empty" id="rcWaitingStatus">대기 중…</p>
+        <h2>링크가 만들어졌습니다</h2>
+        <div class="notice">아래 링크를 복사해서 문자·카카오톡·이메일 등 편하신 방법으로 어르신께 전달해 주세요. 어르신이 대화를 마치면 자동으로 알려드립니다.</div>
+        <label class="field">사전 상담 링크
+          <div style="display:flex;gap:8px">
+            <input type="text" id="rcLinkField" readonly value="${esc(link)}" style="flex:1">
+            <button type="button" class="btn" id="rcCopyBtn">복사</button>
+          </div>
+        </label>
+        <p class="voice-empty" id="rcWaitingStatus">어르신 응답 대기 중…</p>
         <div class="actions voice-consent-actions">
           <button type="button" class="btn" id="rcWaitCancel">닫기 (백그라운드에서 계속 대기)</button>
           <button type="button" class="btn primary voice-btn-lg" id="rcRefresh">지금 확인</button>
@@ -555,9 +544,38 @@
       </div>`;
     body.querySelector('#rcWaitCancel').onclick = closeOverlay;
     body.querySelector('#rcRefresh').onclick = () => checkRemoteStatus(true);
+    body.querySelector('#rcCopyBtn').onclick = () => copyRemoteLink(link);
 
     if (remotePollTimer) clearInterval(remotePollTimer);
     remotePollTimer = setInterval(() => checkRemoteStatus(false), 10000);
+  }
+
+  function copyRemoteLink(link) {
+    const btn = overlayEl && overlayEl.querySelector('#rcCopyBtn');
+    const markCopied = () => {
+      if (!btn) return;
+      btn.textContent = '복사됨';
+      setTimeout(() => {
+        if (btn) btn.textContent = '복사';
+      }, 1500);
+    };
+    const fallback = () => {
+      const field = overlayEl && overlayEl.querySelector('#rcLinkField');
+      if (field) {
+        field.select();
+        try {
+          document.execCommand('copy');
+          markCopied();
+        } catch {
+          alert('복사에 실패했습니다. 링크를 직접 선택해 복사해 주세요.');
+        }
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(markCopied).catch(fallback);
+    } else {
+      fallback();
+    }
   }
 
   async function checkRemoteStatus(manual) {

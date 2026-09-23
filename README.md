@@ -12,21 +12,19 @@
 - 아바타는 실제 상담원 사진(`avatar/consultant.jpg`)을 사용하되, 실시간 립싱크 영상이 아니라 상태(듣는 중/말하는 중 등)에 따라 테두리 애니메이션으로 표현합니다. 화면에는 항상 "AI 상담원입니다" 배지를 표시해 실제 사람과 혼동되지 않도록 합니다.
 - 구현 파일: `voice/*.js`, `voice/voice-styles.css` (프론트엔드), `api/voice-session.js`, `api/interview-summary.js` (서버리스, OpenAI 키 보관)
 
-## 원격 사전 상담 (문자 링크)
+## 원격 사전 상담 (링크 공유)
 
-사회복지사가 화면에서 **📱 문자로 사전상담 보내기**를 누르면, 어르신 휴대폰으로 사전 상담 전용 링크(`pre-consult.html`)가 문자로 발송됩니다. 어르신은 그 페이지에서 직접 AI와 대화하고, 마치면 결과가 서버에 잠깐 보관되었다가 사회복지사 화면에 자동으로 나타납니다. 이후 흐름은 동일합니다 — 사회복지사가 검토·수정 후 저장하면, 서버에 임시 보관된 내용은 즉시 삭제됩니다.
+사회복지사가 화면에서 **🔗 사전상담 링크 만들기**를 누르면 사전 상담 전용 링크(`pre-consult.html?t=...`)가 만들어집니다. 이 링크를 문자·카카오톡·이메일 등 기관에서 쓰는 방법으로 직접 전달하면 됩니다(Case-IN이 발송을 대신하지 않습니다). 어르신이 그 페이지에서 AI와 대화를 마치면 결과가 서버에 잠깐 보관되었다가 사회복지사 화면에 자동으로 나타납니다. 이후 흐름은 동일합니다 — 사회복지사가 검토·수정 후 저장하면, 서버에 임시 보관된 내용은 즉시 삭제됩니다.
 
 - `pre-consult.html`, `voice/remote-consult.js`: 어르신이 여는 독립 페이지 (Case-IN 본앱과 별개, IndexedDB 사용 안 함)
 - `api/remote-session.js`: 결과를 3일간만 임시 보관하는 서버 저장소 API (Vercel KV, 이후 자동 만료)
-- `api/send-sms.js`: 문자 발송 API (기본 구현은 알리고). 이미 다른 문자 발송 업체를 쓰고 계시면 이 파일의 `sendViaAligo()` 부분만 교체하면 됩니다.
 - 이 흐름에서도 음성 원본·대화 전문은 저장되지 않으며, 서버에는 구조화된 항목만 짧게 보관됩니다.
 
 ### 배포 (Vercel)
 
 1. 이 저장소를 Vercel 프로젝트로 연결합니다. 별도 빌드 설정이 필요 없습니다(정적 파일 + `api/` 서버리스 함수).
-2. Vercel 프로젝트의 **Settings → Environment Variables**에 아래를 등록합니다 (`.env.example` 참고):
-   - `OPENAI_API_KEY` — AI 사전 상담용
-   - 원격 문자 상담을 쓰신다면: Vercel **Storage → KV** 스토리지를 생성해 프로젝트에 연결(→ `KV_REST_API_URL`/`KV_REST_API_TOKEN` 자동 채워짐), 그리고 문자 발송 업체(알리고 기준 `ALIGO_API_KEY`/`ALIGO_USER_ID`/`ALIGO_SENDER`) 계정 정보
-3. 배포 후 `🎙 AI 사전상담`과 `📱 문자로 사전상담 보내기` 버튼이 정상 동작하는지 확인합니다.
+2. Vercel 프로젝트의 **Settings → Environment Variables**에 `OPENAI_API_KEY`를 등록합니다 (`.env.example` 참고).
+3. 원격 사전상담(링크 만들기)을 쓰시려면 Vercel **Storage → KV** 스토리지를 생성해 프로젝트에 연결하세요 (→ `KV_REST_API_URL`/`KV_REST_API_TOKEN`이 자동으로 채워집니다).
+4. 배포 후 `🎙 AI 사전상담`과 `🔗 사전상담 링크 만들기` 버튼이 정상 동작하는지 확인합니다.
 
-OpenAI API 키와 문자 발송 키는 절대 브라우저 코드에 포함되지 않으며, 서버 환경변수로만 존재합니다. 브라우저는 `/api/voice-session`이 발급한 단명(ephemeral) 토큰으로만 OpenAI Realtime API와 직접 연결합니다.
+OpenAI API 키는 절대 브라우저 코드에 포함되지 않으며, 서버 환경변수로만 존재합니다. 브라우저는 `/api/voice-session`이 발급한 단명(ephemeral) 토큰으로만 OpenAI Realtime API와 직접 연결합니다.
