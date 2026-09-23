@@ -1,0 +1,8 @@
+{
+  "name": "case-in",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  }
+}

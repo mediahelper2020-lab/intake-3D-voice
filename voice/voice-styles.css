@@ -1,0 +1,59 @@
+/* Case-IN Voice — AI 음성 초기면접 전용 스타일 (기존 Case-IN 톤과 통일: 화이트톤, 낮은 채도, 큰 글씨) */
+.voice-overlay{position:fixed;inset:0;background:#0e263bd9;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+.voice-modal{background:#fff;border-radius:20px;box-shadow:0 30px 90px #0e263b55;width:min(980px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.voice-header{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #e5eeea;background:#f7fbf9}
+.voice-header strong{font-size:19px;color:#12374d;letter-spacing:-.03em}
+.voice-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#356}
+.voice-status-dot{width:11px;height:11px;border-radius:50%;background:#9fb0ba;display:inline-block}
+.voice-status-dot[data-state="active"]{background:#159878}
+.voice-status-dot[data-state="connecting"]{background:#d7a339}
+.voice-status-dot[data-state="paused"]{background:#7a8b95}
+.voice-status-dot[data-state="error"]{background:#c1454c}
+.voice-close{margin-left:auto;border-radius:50%;width:38px;height:38px;padding:0;font-size:15px}
+.voice-body{padding:22px 26px;overflow-y:auto;font-size:16px;line-height:1.6}
+
+/* 동의 화면 */
+.voice-consent h2{margin:0 0 14px;font-size:22px;color:#12374d}
+.voice-consent-notice p{margin:4px 0}
+.voice-consent-check{display:flex;align-items:center;gap:10px;margin:18px 0;font-size:15px;font-weight:650}
+.voice-consent-check input{width:20px;height:20px}
+.voice-consent-actions{justify-content:flex-end;margin-top:18px}
+
+/* 진행 화면 */
+.voice-active{display:grid;grid-template-columns:320px 1fr;gap:20px}
+.voice-avatar-col{background:#f7fbf9;border:1px solid #e2ece8;border-radius:16px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:320px}
+.voice-avatar-face{position:relative;width:118px;height:118px;display:flex;align-items:center;justify-content:center}
+.voice-avatar-emoji{font-size:58px;z-index:1}
+.voice-avatar-ring{position:absolute;inset:0;border-radius:50%;border:4px solid #d7e7e1}
+.voice-avatar-face[data-state="listening"] .voice-avatar-ring{border-color:#159878}
+.voice-avatar-face[data-state="thinking"] .voice-avatar-ring{border-color:#d7a339}
+.voice-avatar-face[data-state="speaking"] .voice-avatar-ring{border-color:#137f67;border-width:6px}
+.voice-avatar-face[data-state="paused"] .voice-avatar-ring{border-color:#9aa7ae;border-style:dashed}
+.voice-avatar-face[data-state="error"] .voice-avatar-ring{border-color:#c1454c}
+.voice-avatar-caption{text-align:center;font-size:16px;color:#274d43;min-height:48px;font-weight:600}
+
+.voice-panel-col{min-height:320px;display:flex;flex-direction:column}
+.voice-panel-col h3{margin:0 0 10px;font-size:16px;color:#183a48}
+.voice-findings-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.voice-finding-item{display:flex;align-items:center;gap:10px;border:1px solid #e7efeb;border-radius:11px;padding:10px 12px;background:#fbfefd}
+.voice-mark-ok{color:#137f67;font-weight:800;font-size:17px}
+.voice-mark-check{color:#c98a1f;font-weight:800;font-size:17px}
+.voice-finding-text{flex:1;font-size:15px}
+.voice-risk-tag{font-size:12px;color:#b53e45;font-weight:700;white-space:nowrap}
+.voice-finding-remove{border:0;background:transparent;color:#95a5ac;cursor:pointer;font-size:15px}
+.voice-empty{color:#8a9aa1;text-align:center;padding:24px 0}
+
+.voice-footer{display:flex;gap:10px;flex-wrap:wrap;padding:16px 22px;border-top:1px solid #e5eeea;background:#f7fbf9;justify-content:flex-end}
+.voice-btn-lg{font-size:16px;padding:13px 20px;min-height:48px;font-weight:700}
+
+/* 검토 화면 */
+.voice-review h2{margin:0 0 6px;font-size:21px;color:#12374d}
+.voice-review h3{margin:20px 0 8px;font-size:15px;color:#183a48;border-left:3px solid #28a081;padding-left:10px}
+.voice-review-list{display:flex;flex-direction:column;gap:8px}
+.voice-review-row{border:1px solid #e7efeb;border-radius:11px;padding:10px 12px;background:#fbfefd;display:flex;flex-direction:column;gap:4px}
+.voice-review-row label{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.voice-review-row input[type=text]{flex:1;min-width:160px}
+.voice-review-source{font-size:12px;color:#7a8b95}
+.voice-summary-block p{margin:5px 0;font-size:14px}
+
+@media(max-width:760px){.voice-active{grid-template-columns:1fr}.voice-avatar-col{min-height:220px}}
