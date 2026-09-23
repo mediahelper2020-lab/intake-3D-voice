@@ -19,6 +19,10 @@ export default function handler(req, res) {
       length: typeof value === 'string' ? value.length : 0
     };
   }
+  // 예상한 이름과 다르게 들어와 있을 가능성에 대비해, REDIS/KV/UPSTASH가 들어간
+  // 환경변수 "이름"만 전부 나열한다 (값은 절대 포함하지 않는다).
+  report._relatedKeyNamesFound = Object.keys(process.env).filter((k) => /REDIS|KV|UPSTASH/i.test(k));
+  report._deployedAt = new Date().toISOString();
   report._note = 'present/length만 표시하며 실제 값은 절대 포함하지 않습니다.';
   res.status(200).json(report);
 }
