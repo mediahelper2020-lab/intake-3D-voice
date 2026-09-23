@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  const LOGO_ICON_SRC = 'avatar/logo-icon.png';
+  const LOGO_ICON_SRC = 'avatar/logo-full.png';
   const MAX_TILT_DEG = 20;
 
   function createOrbAvatar(rootEl) {
