@@ -45,11 +45,13 @@
 .voice-active{display:grid;grid-template-columns:320px 1fr;gap:20px}
 .voice-avatar-col{background:linear-gradient(180deg,#f7fbf9,#eef6f3);border:1px solid #e2ece8;border-radius:20px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:340px}
 .voice-avatar-face{position:relative;width:200px;height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;perspective:700px}
-.voice-orb-wrap{position:relative;width:150px;height:150px;display:flex;align-items:center;justify-content:center;transform-style:preserve-3d;animation:voiceOrbFloat 5s ease-in-out infinite}
+.voice-orb-wrap{position:relative;width:150px;height:150px;display:flex;align-items:center;justify-content:center;transform-style:preserve-3d;animation:voiceOrbFloat 5s ease-in-out infinite;cursor:pointer;touch-action:pan-y}
+.voice-orb-tilt{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;transform-style:preserve-3d;transition:transform .12s ease-out;will-change:transform}
 .voice-orb-halo{position:absolute;inset:-24px;border-radius:50%;background:conic-gradient(from 0deg,var(--halo-a,#12374d),var(--halo-b,#2f6fa8),var(--halo-a,#12374d) 70%,var(--halo-b,#2f6fa8));filter:blur(16px);opacity:var(--halo-o,.4);animation:voiceHaloSpin var(--halo-speed,9s) linear infinite;transition:opacity .35s}
-.voice-orb-sphere{position:relative;width:136px;height:136px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 32% 26%,#4a80ab 0%,#1c3f63 48%,#081420 100%);box-shadow:0 16px 30px -10px #05101c8c,inset 0 3px 7px #ffffff2e,inset 0 -10px 16px #00000059;transition:transform .3s;overflow:hidden}
+.voice-orb-sphere{position:relative;width:136px;height:136px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 32% 26%,#4a80ab 0%,#1c3f63 48%,#081420 100%);box-shadow:0 18px 34px -10px #05101ca8,inset 0 3px 7px #ffffff2e,inset 0 -10px 16px #00000059;overflow:hidden}
 .voice-orb-icon{width:58%;height:58%;object-fit:contain;position:relative;z-index:1;filter:drop-shadow(0 2px 4px #00000059)}
-.voice-orb-sheen{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 30% 22%,#ffffffa6,transparent 55%);mix-blend-mode:screen;pointer-events:none}
+.voice-orb-sheen{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 30% 22%,#ffffffb0,transparent 55%);mix-blend-mode:screen;pointer-events:none;transition:transform .12s ease-out}
+.voice-orb-hint{font-size:11px;color:#7a938d;font-weight:700;letter-spacing:.03em;opacity:.75;margin-top:-4px;animation:voiceHintFade 2.6s ease-in-out 1 2.5s forwards}
 
 .voice-avatar-face[data-state="idle"] .voice-orb-halo{--halo-a:#12374d;--halo-b:#2f6fa8;--halo-o:.35;--halo-speed:10s}
 .voice-avatar-face[data-state="listening"] .voice-orb-halo{--halo-a:#0e8e85;--halo-b:#4fe3c1;--halo-o:.62;--halo-speed:5s}
@@ -64,7 +66,8 @@
 @keyframes voiceHaloSpin{to{transform:rotate(360deg)}}
 @keyframes voiceOrbFloat{0%,100%{transform:translateY(0) rotateX(0) rotateY(0)}50%{transform:translateY(-5px) rotateX(3deg) rotateY(-4deg)}}
 @keyframes voiceOrbPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
-@media (prefers-reduced-motion: reduce){.voice-orb-wrap,.voice-orb-halo,.voice-avatar-face[data-state="speaking"] .voice-orb-sphere{animation:none!important}}
+@keyframes voiceHintFade{0%{opacity:.75}100%{opacity:0;visibility:hidden}}
+@media (prefers-reduced-motion: reduce){.voice-orb-wrap,.voice-orb-halo,.voice-avatar-face[data-state="speaking"] .voice-orb-sphere{animation:none!important}.voice-orb-hint{animation:none!important;opacity:0}}
 
 .voice-avatar-caption{text-align:center;font-size:15.5px;color:#274d43;min-height:44px;font-weight:650;margin-top:6px;padding:0 6px}
 

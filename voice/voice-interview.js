@@ -18,6 +18,7 @@
   let summaryResult = null;
   let remoteToken = null;
   let remotePollTimer = null;
+  let greetingSent = false; // AI가 연결 직후 먼저 인사를 건네도록 한 번만 트리거
   let pendingElderName = ''; // 시작 전 등록한 어르신 성함 (AI에게는 전달하지 않고, 사례 이름 등록용으로만 사용)
   let targetCaseId = null; // 원격 링크가 기존에 열려 있던 특정 사례용으로 만들어진 경우 그 사례 id
 
@@ -167,6 +168,7 @@
     remoteToken = null;
     pendingElderName = '';
     targetCaseId = null;
+    greetingSent = false;
   }
 
   function buildShell() {
@@ -373,12 +375,18 @@
   async function startInterview() {
     setStatus('connecting', '연결 중…');
     renderActiveScreen();
+    greetingSent = false;
     client = new window.RealtimeVoiceClient({
       onEvent: handleRealtimeEvent,
       onConnectionState: (state) => {
         if (state === 'connected') {
           sessionActive = true;
           setStatus('active', 'AI 연결됨');
+          if (!greetingSent) {
+            greetingSent = true;
+            avatar && avatar.setThinking(true);
+            client.sendEvent({ type: 'response.create' });
+          }
         } else if (state === 'failed' || state === 'disconnected') {
           if (sessionActive) setStatus('error', '연결이 끊어졌습니다');
         }

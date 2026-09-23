@@ -11,6 +11,7 @@
   let findings = [];
   let currentCaption = '';
   let ended = false;
+  let greetingSent = false;
 
   function getToken() {
     const params = new URLSearchParams(location.search);
@@ -134,7 +135,17 @@
   async function startSession() {
     renderActive();
     avatar.setThinking(false);
-    client = new window.RealtimeVoiceClient({ onEvent: handleRealtimeEvent, onConnectionState: () => {} });
+    greetingSent = false;
+    client = new window.RealtimeVoiceClient({
+      onEvent: handleRealtimeEvent,
+      onConnectionState: (state) => {
+        if (state === 'connected' && !greetingSent) {
+          greetingSent = true;
+          avatar && avatar.setThinking(true);
+          client.sendEvent({ type: 'response.create' });
+        }
+      }
+    });
     try {
       await client.connect();
     } catch (err) {
