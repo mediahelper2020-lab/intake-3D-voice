@@ -13,6 +13,7 @@
       '<div class="voice-avatar-face" data-state="idle">' +
       '<span class="voice-avatar-photo-ring">' +
       '<img class="voice-avatar-photo" src="' + AVATAR_IMAGE_SRC + '" alt="AI 상담원 아바타" draggable="false">' +
+      '<span class="voice-avatar-mouth-bars" aria-hidden="true"><i></i><i></i><i></i></span>' +
       '</span>' +
       '<span class="voice-avatar-ai-badge">AI 상담원입니다</span>' +
       '</div>' +
