@@ -33,7 +33,15 @@ export default async function handler(req, res) {
           audio: {
             input: {
               transcription: { model: 'gpt-4o-mini-transcribe' },
-              turn_detection: { type: 'server_vad' }
+              // 어르신은 말씀 중간에 잠시 멈추는 경우가 많고, 주변 소음(TV, 생활 소음 등)에
+              // AI가 스스로 말을 멈추는 오작동이 없도록 기본값보다 덜 민감하게, 침묵 인식은
+              // 조금 더 여유 있게 설정한다.
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.65,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 750
+              }
             },
             output: {
               voice: 'alloy'

@@ -20,6 +20,7 @@
   let remoteToken = null;
   let remotePollTimer = null;
   let greetingSent = false; // AI가 연결 직후 먼저 인사를 건네도록 한 번만 트리거
+  let needsFollowUp = false; // 도구 호출 후 response.create를 턴당 한 번만 보내기 위한 플래그
   let wrapupTimer = null;
   let hardCutoffTimer = null;
   const MAX_CALL_MS = 5 * 60 * 1000; // 통화 최대 길이
@@ -189,6 +190,7 @@
     pendingElderName = '';
     targetCaseId = null;
     greetingSent = false;
+    needsFollowUp = false;
   }
 
   function buildShell() {
@@ -390,7 +392,9 @@
       type: 'conversation.item.create',
       item: { type: 'function_call_output', call_id: evt.call_id, output: JSON.stringify({ ok: true }) }
     });
-    client.sendEvent({ type: 'response.create' });
+    // response.create는 턴당 한 번만 보내야 한다. 같은 턴에서 도구를 여러 번 호출해도
+    // 여기서는 플래그만 세우고, 실제 요청은 response.done 시점에 한 번만 보낸다.
+    needsFollowUp = true;
   }
 
   function handleRealtimeEvent(evt) {
@@ -414,6 +418,14 @@
       case 'response.function_call_arguments.done':
         handleFunctionCall(evt);
         break;
+      case 'response.done': {
+        const status = evt.response && evt.response.status;
+        if (needsFollowUp && status !== 'cancelled') {
+          needsFollowUp = false;
+          client.sendEvent({ type: 'response.create' });
+        }
+        break;
+      }
       case 'error':
         renderErrorScreen(evt.error?.message || 'AI 응답 중 오류가 발생했습니다.');
         break;
@@ -426,6 +438,7 @@
     setStatus('connecting', '연결 중…');
     renderActiveScreen();
     greetingSent = false;
+    needsFollowUp = false;
     client = new window.RealtimeVoiceClient({
       onEvent: handleRealtimeEvent,
       onConnectionState: (state) => {

@@ -35,6 +35,7 @@
   let currentCaption = '';
   let ended = false;
   let greetingSent = false;
+  let needsFollowUp = false; // 도구 호출 후 response.create를 턴당 한 번만 보내기 위한 플래그
   let wrapupTimer = null;
   let hardCutoffTimer = null;
 
@@ -173,7 +174,9 @@
       type: 'conversation.item.create',
       item: { type: 'function_call_output', call_id: evt.call_id, output: JSON.stringify({ ok: true }) }
     });
-    client.sendEvent({ type: 'response.create' });
+    // response.create는 턴당 한 번만 보내야 한다. 같은 턴에서 도구를 여러 번 호출해도
+    // 여기서는 플래그만 세우고, 실제 요청은 response.done 시점에 한 번만 보낸다.
+    needsFollowUp = true;
   }
 
   function handleRealtimeEvent(evt) {
@@ -197,6 +200,14 @@
       case 'response.function_call_arguments.done':
         handleFunctionCall(evt);
         break;
+      case 'response.done': {
+        const status = evt.response && evt.response.status;
+        if (needsFollowUp && status !== 'cancelled') {
+          needsFollowUp = false;
+          client.sendEvent({ type: 'response.create' });
+        }
+        break;
+      }
       case 'error':
         renderConnectError(evt.error?.message || 'AI 응답 중 문제가 발생했습니다.');
         break;
@@ -209,6 +220,7 @@
     renderActive();
     avatar.setThinking(false);
     greetingSent = false;
+    needsFollowUp = false;
     tips = [];
     client = new window.RealtimeVoiceClient({
       onEvent: handleRealtimeEvent,
