@@ -241,23 +241,34 @@
           <p>언제든지 화면의 <b>[직원에게 전환]</b> 버튼으로 AI 대화를 중단하고 직원에게 도움을 요청할 수 있습니다.</p>
         </div>
         <label class="voice-consent-check"><input type="checkbox" id="voiceConsentCheck"> 위 내용을 확인하였으며, 마이크 사용 및 AI 사전 상담 진행에 동의합니다.</label>
+        <p class="voice-consent-error" id="voiceConsentError" style="display:none;color:#b42318;font-weight:700;margin:-10px 0 0"></p>
         <div class="actions voice-consent-actions">
           <button type="button" class="btn" id="voiceConsentCancel">취소</button>
-          <button type="button" class="btn primary voice-btn-lg" id="voiceConsentStart" disabled>동의하고 시작</button>
+          <button type="button" class="btn primary voice-btn-lg" id="voiceConsentStart">동의하고 시작</button>
         </div>
       </div>`;
     const check = body.querySelector('#voiceConsentCheck');
     const startBtn = body.querySelector('#voiceConsentStart');
     const nameInput = body.querySelector('#voiceElderName');
-    function refreshStartEnabled() {
-      const nameOk = !needsName || (nameInput && nameInput.value.trim());
-      startBtn.disabled = !(check.checked && nameOk);
-    }
-    check.onchange = refreshStartEnabled;
-    if (nameInput) nameInput.oninput = refreshStartEnabled;
+    const errorEl = body.querySelector('#voiceConsentError');
     body.querySelector('#voiceConsentCancel').onclick = closeOverlay;
+    // 버튼은 항상 눌리도록 두고(기기·IME에 따라 입력 이벤트가 불안정해도 버튼이
+    // "먹통"처럼 보이지 않도록), 클릭 시점에 조건을 검사해 안내 문구로 알려준다.
     startBtn.onclick = () => {
-      pendingElderName = needsName ? nameInput.value.trim() : existingName;
+      const trimmedName = nameInput ? nameInput.value.trim() : '';
+      if (needsName && !trimmedName) {
+        errorEl.textContent = '어르신 성함을 입력해 주세요.';
+        errorEl.style.display = '';
+        nameInput && nameInput.focus();
+        return;
+      }
+      if (!check.checked) {
+        errorEl.textContent = '동의 체크박스를 선택해 주세요.';
+        errorEl.style.display = '';
+        return;
+      }
+      errorEl.style.display = 'none';
+      pendingElderName = needsName ? trimmedName : existingName;
       try {
         localStorage.setItem(CONSENT_KEY, '1');
       } catch {}
@@ -731,20 +742,29 @@
           ? `<label class="field">어르신 성함 (Case-IN 목록 등록용, AI에게 전달되지 않음)<input type="text" id="rcElderName" placeholder="예: 김OO"></label>`
           : `<p class="help">대상: <b>${esc(existingName || '이름 미입력')}</b></p>`}
         <p class="help">버튼을 누르면 어르신이 직접 열어볼 수 있는 사전 상담 링크가 만들어집니다. 이 링크를 문자·카카오톡·이메일 등 원하시는 방법으로 직접 전달해 주세요. 어르신이 대화를 마치면 홈 화면의 "사전상담 진행 현황"에 자동으로 표시됩니다. 사회복지사가 확인·수정한 뒤에만 Case-IN에 저장됩니다.</p>
+        <p class="voice-consent-error" id="rcNameError" style="display:none;color:#b42318;font-weight:700;margin:-6px 0 0"></p>
         <div class="actions voice-consent-actions">
           <button type="button" class="btn" id="rcCancel">취소</button>
-          <button type="button" class="btn primary voice-btn-lg" id="rcCreate" ${needsName ? 'disabled' : ''}>링크 만들기</button>
+          <button type="button" class="btn primary voice-btn-lg" id="rcCreate">링크 만들기</button>
         </div>
       </div>`;
     const nameInput = body.querySelector('#rcElderName');
     const createBtn = body.querySelector('#rcCreate');
-    if (nameInput) {
-      nameInput.oninput = () => {
-        createBtn.disabled = !nameInput.value.trim();
-      };
-    }
+    const errorEl = body.querySelector('#rcNameError');
     body.querySelector('#rcCancel').onclick = closeOverlay;
-    createBtn.onclick = () => createRemoteLink(needsName ? nameInput.value.trim() : existingName);
+    // 버튼은 항상 눌리도록 두고(기기·IME에 따라 입력 이벤트가 불안정해도 버튼이
+    // "먹통"처럼 보이지 않도록), 클릭 시점에 조건을 검사해 안내 문구로 알려준다.
+    createBtn.onclick = () => {
+      const trimmedName = nameInput ? nameInput.value.trim() : '';
+      if (needsName && !trimmedName) {
+        errorEl.textContent = '어르신 성함을 입력해 주세요.';
+        errorEl.style.display = '';
+        nameInput && nameInput.focus();
+        return;
+      }
+      errorEl.style.display = 'none';
+      createRemoteLink(needsName ? trimmedName : existingName);
+    };
   }
 
   async function createRemoteLink(elderName) {
